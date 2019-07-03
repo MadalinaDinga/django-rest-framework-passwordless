@@ -13,16 +13,25 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-def authenticate_by_token(callback_token):
+def authenticate_by_token(callback_token,email=None, mobile=None):
     try:
         token = CallbackToken.objects.get(key=callback_token, is_active=True)
 
-        # Returning a user designates a successful authentication.
-        token.user = User.objects.get(pk=token.user.pk)
-        token.is_active = False  # Mark this token as used.
-        token.save()
+        token_user = User.objects.get(pk=token.user.pk)
+        if email:
+            to_verify_user = User.objects.get(email=email)
+        elif mobile:
+            to_verify_user = User.objects.get(mobile=mobile)
+        else:
+            return None
 
-        return token.user
+        if token_user.id == to_verify_user.id:
+            # Returning a user designates a successful authentication.
+            token.user = token_user
+            token.is_active = False  # Mark this token as used.
+            token.save()
+
+            return token.user
 
     except CallbackToken.DoesNotExist:
         logger.debug("drfpasswordless: Challenged with a callback token that doesn't exist.")

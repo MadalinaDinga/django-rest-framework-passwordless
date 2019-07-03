@@ -169,42 +169,50 @@ class AbstractBaseCallbackTokenSerializer(serializers.Serializer):
     Returns a user if valid, None or a message if not.
     """
     token = TokenField(min_length=6, max_length=6, validators=[token_age_validator])
+    email = serializers.CharField(allow_null=True,required=False)
+    mobile = serializers.CharField(allow_null=True,required=False)
 
 
 class CallbackTokenAuthSerializer(AbstractBaseCallbackTokenSerializer):
 
     def validate(self, attrs):
         callback_token = attrs.get('token', None)
+        email = attrs.get('email', None)
+        mobile = attrs.get('mobile', None)
+
 
         token = CallbackToken.objects.get(key=callback_token, is_active=True)
-
-        if token:
-            # Check the token type for our uni-auth method.
-            # authenticates and checks the expiry of the callback token.
-            user = authenticate_by_token(token)
-            if user:
-                if not user.is_active:
-                    msg = _('User account is disabled.')
-                    raise serializers.ValidationError(msg)
-
-                if api_settings.PASSWORDLESS_USER_MARK_EMAIL_VERIFIED \
-                        or api_settings.PASSWORDLESS_USER_MARK_MOBILE_VERIFIED:
-                    # Mark this alias as verified
-                    user = User.objects.get(pk=token.user.pk)
-                    success = verify_user_alias(user, token)
-
-                    if success is False:
-                        msg = _('Error validating user alias.')
+        if (email != None) ^ (mobile != None):
+            if token:
+                # Check the token type for our uni-auth method.
+                # authenticates and checks the expiry of the callback token.
+                user = authenticate_by_token(token,email=email, mobile=mobile)
+                if user:
+                    if not user.is_active:
+                        msg = _('User account is disabled.')
                         raise serializers.ValidationError(msg)
 
-                attrs['user'] = user
-                return attrs
+                    if api_settings.PASSWORDLESS_USER_MARK_EMAIL_VERIFIED \
+                            or api_settings.PASSWORDLESS_USER_MARK_MOBILE_VERIFIED:
+                        # Mark this alias as verified
+                        user = User.objects.get(pk=token.user.pk)
+                        success = verify_user_alias(user, token)
 
+                        if success is False:
+                            msg = _('Error validating user alias.')
+                            raise serializers.ValidationError(msg)
+
+                    attrs['user'] = user
+                    return attrs
+
+                else:
+                    msg = _('Invalid Token')
+                    raise serializers.ValidationError(msg)
             else:
-                msg = _('Invalid Token')
+                msg = _('Missing authentication token.')
                 raise serializers.ValidationError(msg)
         else:
-            msg = _('Missing authentication token.')
+            msg = _('Missing email (x)or mobile number.')
             raise serializers.ValidationError(msg)
 
 

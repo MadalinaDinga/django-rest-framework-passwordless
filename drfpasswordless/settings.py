@@ -49,7 +49,7 @@ DEFAULTS = {
     'PASSWORDLESS_REGISTER_NEW_USERS': True,
 
     # Suppresses actual SMS for testing
-    'PASSWORDLESS_TEST_SUPPRESSION': False,
+    'PASSWORDLESS_TEST_SUPPRESSION': True,
 
     # Context Processors for Email Template
     'PASSWORDLESS_CONTEXT_PROCESSORS': [],
