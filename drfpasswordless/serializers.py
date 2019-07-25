@@ -54,6 +54,8 @@ class AbstractBaseAliasAuthenticationSerializer(serializers.Serializer):
                     user = User.objects.get(**{self.alias_type: alias})
                 except User.DoesNotExist:
                     user = None
+                except ValueError:
+                    user = None
 
             if user:
                 if not user.is_active:
