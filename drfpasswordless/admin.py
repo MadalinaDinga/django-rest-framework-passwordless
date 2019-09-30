@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import reverse
 from drfpasswordless.models import CallbackToken
+from django.forms.models import BaseInlineFormSet
 
 
 class UserLinkMixin(object):
@@ -16,15 +17,24 @@ class UserLinkMixin(object):
     link_to_user.short_description = 'User'
 
 
-class AbstractCallbackTokenInline(admin.StackedInline):
+class AbstractCallbackTokenInline(admin.TabularInline):
     max_num = 0
     extra = 0
     readonly_fields = ('created_at', 'key', 'is_active')
     fields = ('created_at', 'user', 'key', 'is_active')
+    ordering = ('-created_at',)
 
 
 class CallbackInline(AbstractCallbackTokenInline):
     model = CallbackToken
+
+
+class ActiveCallbackInline(AbstractCallbackTokenInline):
+    model = CallbackToken
+
+    def get_queryset(self, request):
+        qs = super(ActiveCallbackInline, self).get_queryset(request).filter(is_active=True)
+        return qs
 
 
 class AbstractCallbackTokenAdmin(UserLinkMixin, admin.ModelAdmin):
