@@ -7,6 +7,7 @@ from rest_framework import serializers
 from drfpasswordless.models import CallbackToken
 from drfpasswordless.settings import api_settings
 from drfpasswordless.utils import authenticate_by_token, verify_user_alias, validate_token_age
+from django.http import Http404
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -64,7 +65,7 @@ class AbstractBaseAliasAuthenticationSerializer(serializers.Serializer):
                     raise serializers.ValidationError(msg)
             else:
                 msg = _('No account is associated with this alias.')
-                raise serializers.ValidationError(msg)
+                raise Http404(msg)
         else:
             msg = _('Missing %s.') % self.alias_type
             raise serializers.ValidationError(msg)
