@@ -89,6 +89,18 @@ class ObtainMobileCallbackToken(AbstractBaseObtainCallbackToken):
     message_payload = {'mobile_message': mobile_message}
 
 
+class ObtainWhatsAppCallbackToken(AbstractBaseObtainCallbackToken):
+    permission_classes = (AllowAny,)
+    serializer_class = MobileAuthSerializer
+    success_response = "We texted you a login code on WhatsApp."
+    failure_response = "Unable to send you a login code on WhatsApp. Try again later."
+
+    alias_type = 'whatsapp'
+
+    whatsapp_message = api_settings.PASSWORDLESS_MOBILE_MESSAGE
+    message_payload = {'whatsapp_message': whatsapp_message}
+
+
 class ObtainEmailVerificationCallbackToken(AbstractBaseObtainCallbackToken):
     permission_classes = (IsAuthenticated,)
     serializer_class = EmailVerificationSerializer
