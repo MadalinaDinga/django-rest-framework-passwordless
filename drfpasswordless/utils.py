@@ -117,38 +117,36 @@ def send_email_with_callback_token(user, email_token, **kwargs):
     """
 
     try:
-        if api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS:
-            # Make sure we have a sending address before sending.
-
-            # Get email subject and message
-            email_subject = kwargs.get('email_subject',
-                                       api_settings.PASSWORDLESS_EMAIL_SUBJECT)
-            email_plaintext = kwargs.get('email_plaintext',
-                                         api_settings.PASSWORDLESS_EMAIL_PLAINTEXT_MESSAGE)
-            email_html = kwargs.get('email_html',
-                                    api_settings.PASSWORDLESS_EMAIL_TOKEN_HTML_TEMPLATE_NAME)
-
-            # Inject context if user specifies.
-            context = inject_template_context({'callback_token': email_token.key, })
-            html_message = loader.render_to_string(email_html, context, )
-            send_mail(
-                email_subject,
-                email_plaintext % email_token.key,
-                api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS,
-                [getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)],
-                fail_silently=False,
-                html_message=html_message, )
-
-        else:
+        # Make sure we have a sending address before sending.
+        if not api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS:
             logger.debug("Failed to send token email. Missing PASSWORDLESS_EMAIL_NOREPLY_ADDRESS.")
             return False
-        return True
 
+        # Get email subject and message
+        email_subject = kwargs.get('email_subject',
+                                   api_settings.PASSWORDLESS_EMAIL_SUBJECT)
+        email_plaintext = kwargs.get('email_plaintext',
+                                     api_settings.PASSWORDLESS_EMAIL_PLAINTEXT_MESSAGE)
+        email_html = kwargs.get('email_html',
+                                api_settings.PASSWORDLESS_EMAIL_TOKEN_HTML_TEMPLATE_NAME)
+
+        # Inject context if user specifies.
+        context = inject_template_context({'callback_token': email_token.key, })
+        html_message = loader.render_to_string(email_html, context, )
+        send_mail(
+            email_subject,
+            email_plaintext % email_token.key,
+            api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS,
+            [getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)],
+            fail_silently=False,
+            html_message=html_message, )
+
+        return True
     except Exception as e:
-        logger.debug("Failed to send token email to user: %d."
-                     "Possibly no email on user object. Email entered was %s" %
-                     (user.id, getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)))
-        logger.debug(e)
+        logger.debug(
+            f"Failed to send token email to user {user.id}. "
+            f"Possibly no email on user object. The email entered was {getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)}. "
+            f"Failed with error message: {e}")
         return False
 
 
@@ -156,45 +154,47 @@ def send_sms_with_callback_token(user, mobile_token, **kwargs):
     """
     Sends a SMS to user.mobile via Twilio.
 
-    Passes silently without sending in test environment.
+    Checks the PASSWORDLESS_TEST_SUPPRESSION setting. The method passes silently without
+    sending the WhatsApp message in testing environment.
     """
     base_string = kwargs.get('mobile_message', api_settings.PASSWORDLESS_MOBILE_MESSAGE)
 
     try:
-
-        if api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER:
-            # We need a sending number to send properly
-            if api_settings.PASSWORDLESS_TEST_SUPPRESSION:
-                # we assume success to prevent spamming SMS during testing.
-                return True
-
-            twilio_client = Client(os.environ['TWILIO_ACCOUNT_SID'], os.environ['TWILIO_AUTH_TOKEN'])
-
-            to_number = getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)
-            if to_number.__class__.__name__ == 'PhoneNumber':
-                to_number = to_number.__str__()
-
-            twilio_client.messages.create(
-                body=base_string % mobile_token.key,
-                to=to_number,
-                from_=api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER
-            )
-            return True
-        else:
-            logger.debug("Failed to send token sms. Missing PASSWORDLESS_MOBILE_NOREPLY_NUMBER.")
+        if not api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER:
+            logger.debug("Failed to send token via SMS. Missing PASSWORDLESS_MOBILE_NOREPLY_NUMBER.")
             return False
-    except ImportError:
-        logger.debug("Couldn't import Twilio client. Is twilio installed?")
+
+        # We need a sending number to send properly
+        if api_settings.PASSWORDLESS_TEST_SUPPRESSION:
+            # we assume success to prevent spamming SMS during testing.
+            return True
+
+        twilio_client = Client(os.environ['TWILIO_ACCOUNT_SID'], os.environ['TWILIO_AUTH_TOKEN'])
+
+        # The number where the token will be sent via SMS
+        to_number = getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)
+        if to_number.__class__.__name__ == 'PhoneNumber':
+            to_number = to_number.__str__()
+
+        twilio_client.messages.create(
+            body=base_string % mobile_token.key,
+            to=to_number,
+            from_=api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER
+        )
+        return True
+    except ImportError as e:
+        logger.debug("Failed to create Twilio client. Please check your Twilio environment settings. "
+                     f"Failed with error message: {e}")
         return False
-    except KeyError:
-        logger.debug("Couldn't send SMS."
-                     "Did you set your Twilio account tokens and specify a PASSWORDLESS_MOBILE_NOREPLY_NUMBER?")
+    except KeyError as e:
+        logger.debug("Failed to send token via SMS. Please check your Twilio environment settings. "
+                     f"Failed with error message: {e}")
+        return False
     except Exception as e:
-        logger.debug("Failed to send token SMS to user: {}. "
-                     "Possibly no mobile number on user object or the twilio package isn't set up yet. "
-                     "Number entered was {}".format(user.id,
-                                                    getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)))
-        logger.debug(e)
+        logger.debug(
+            f"Failed to send token SMS to user {user.id}, "
+            f"with number {getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)}. "
+            f"Failed with error message: {e}")
         return False
 
 
@@ -202,51 +202,48 @@ def send_whatsapp_message_with_callback_token(user, mobile_token, **kwargs):
     """
     Sends a WhatsApp message to user.mobile via Twilio.
 
-    Passes silently without sending in test environment.
+    Checks the PASSWORDLESS_TEST_SUPPRESSION setting. The method passes silently without
+    sending the WhatsApp message in testing environment.
     """
     base_string = kwargs.get('whatsapp_message', api_settings.PASSWORDLESS_MOBILE_MESSAGE)
 
     try:
-        if api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER:
-            # We need a sending number to send properly
-            if api_settings.PASSWORDLESS_TEST_SUPPRESSION:
-                # we assume success to prevent spamming WhatsApp messages during testing.
-                return True
-
-            twilio_client = Client(os.environ['TWILIO_ACCOUNT_SID'], os.environ['TWILIO_AUTH_TOKEN'])
-
-            # The number where the token will be sent via WhatsApp
-            to_whatsapp_number = getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)
-            if to_whatsapp_number.__class__.__name__ == 'PhoneNumber':
-                to_whatsapp_number = f"whatsapp:{to_whatsapp_number.__str__()}"
-
-            # The number sending the token via WhatsApp (the Twilio Sandbox)
-            from_whatsapp_number = f"whatsapp:{api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER}"
-
-            try:
-                twilio_client.messages.create(
-                    body=f"{base_string}{mobile_token.key}",
-                    to=to_whatsapp_number,
-                    from_=from_whatsapp_number
-                )
-            except Exception as e:
-                print(e)
-                raise
-            finally:
-                return True
-        else:
-            logger.debug("Failed to send token sms. Missing PASSWORDLESS_MOBILE_NOREPLY_NUMBER.")
+        if not api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER:
+            logger.debug("Failed to send token via WhatsApp. Missing PASSWORDLESS_MOBILE_NOREPLY_NUMBER.")
             return False
-    except ImportError:
-        logger.debug("Couldn't import Twilio client. Is Twilio installed?")
+
+        # We need a sending number to send properly
+        if api_settings.PASSWORDLESS_TEST_SUPPRESSION:
+            # Assume success to prevent spamming WhatsApp messages during testing.
+            return True
+
+        twilio_client = Client(os.environ['TWILIO_ACCOUNT_SID'], os.environ['TWILIO_AUTH_TOKEN'])
+
+        # The number where the token will be sent via WhatsApp
+        to_whatsapp_number = getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)
+        if to_whatsapp_number.__class__.__name__ == 'PhoneNumber':
+            to_whatsapp_number = f"whatsapp:{to_whatsapp_number.__str__()}"
+
+        # The number sending the token via WhatsApp (the Twilio Sandbox)
+        from_whatsapp_number = f"whatsapp:{api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER}"
+
+        twilio_client.messages.create(
+            body=f"{base_string}{mobile_token.key}",
+            to=to_whatsapp_number,
+            from_=from_whatsapp_number
+        )
+        return True
+    except ImportError as e:
+        logger.debug("Failed to create Twilio client. Please check your Twilio environment settings. "
+                     f"Failed with error message: {e}")
         return False
-    except KeyError:
-        logger.debug("Couldn't send SMS."
-                     "Did you set your Twilio account tokens and specify a PASSWORDLESS_MOBILE_NOREPLY_NUMBER?")
+    except KeyError as e:
+        logger.debug("Failed to send token via WhatsApp. Please check your Twilio environment settings. "
+                     f"Failed with error message: {e}")
+        return False
     except Exception as e:
-        logger.debug("Failed to send token SMS to user: {}. "
-                     "Possibly no mobile number on user object or the twilio package isn't set up yet. "
-                     "Number entered was {}".format(user.id,
-                                                    getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)))
-        logger.debug(e)
+        logger.debug(
+            f"Failed to send token SMS to user {user.id}, "
+            f"with number {getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)}. "
+            f"Failed with error message: {e}")
         return False
