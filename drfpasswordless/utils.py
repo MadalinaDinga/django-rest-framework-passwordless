@@ -212,20 +212,23 @@ def send_whatsapp_message_with_callback_token(user, mobile_token, **kwargs):
         if api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER:
             # We need a sending number to send properly
             if api_settings.PASSWORDLESS_TEST_SUPPRESSION:
-                # we assume success to prevent spamming SMS during testing.
+                # we assume success to prevent spamming WhatsApp messages during testing.
                 return True
 
             twilio_client = Client(os.environ['TWILIO_ACCOUNT_SID'], os.environ['TWILIO_AUTH_TOKEN'])
 
-            # TODO: send WhatsApp message
-            to_number = getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)
-            if to_number.__class__.__name__ == 'PhoneNumber':
-                to_number = to_number.__str__()
+            # The number where the token will be sent via WhatsApp
+            to_whatsapp_number = getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)
+            if to_whatsapp_number.__class__.__name__ == 'PhoneNumber':
+                to_whatsapp_number = f"whatsapp:{to_whatsapp_number.__str__()}"
+
+            # The number sending the token via WHatsApp (the Twilio Sandbox)
+            from_whatsapp_number = f"whatsapp:{api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER}"
 
             twilio_client.messages.create(
                 body=f"{base_string}{mobile_token.key}",
-                to=to_number,
-                from_=api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER
+                to=to_whatsapp_number,
+                from_=from_whatsapp_number
             )
             return True
         else:
