@@ -135,7 +135,7 @@ def send_email_with_callback_token(user, email_token, **kwargs):
         html_message = loader.render_to_string(email_html, context, )
         send_mail(
             email_subject,
-            email_plaintext % email_token.key,
+            f"{email_plaintext}{email_token.key}",
             api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS,
             [getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)],
             fail_silently=False,
@@ -177,7 +177,7 @@ def send_sms_with_callback_token(user, mobile_token, **kwargs):
             to_number = to_number.__str__()
 
         twilio_client.messages.create(
-            body=base_string % mobile_token.key,
+            body=f"{base_string}{mobile_token.key}",
             to=to_number,
             from_=api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER
         )

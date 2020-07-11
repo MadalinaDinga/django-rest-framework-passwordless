@@ -51,7 +51,7 @@ DEFAULTS = {
     # Registers previously unseen aliases as new users.
     'PASSWORDLESS_REGISTER_NEW_USERS': True,
 
-    # Suppresses actual SMS for testing
+    # Suppresses actual SMS/WhatsApp message to be sent in testing environment
     'PASSWORDLESS_TEST_SUPPRESSION': True,
 
     # Context Processors for Email Template
