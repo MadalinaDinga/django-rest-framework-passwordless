@@ -52,12 +52,10 @@ def create_callback_token_for_user(user, token_type):
         token = CallbackToken.objects.create(user=user,
                                              to_alias_type=token_type,
                                              to_alias=getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME))
-
-    elif token_type == 'MOBILE':
+    elif token_type in ['MOBILE', 'WHATSAPP']:
         token = CallbackToken.objects.create(user=user,
                                              to_alias_type=token_type,
                                              to_alias=getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME))
-
     if token is not None:
         return token
 
@@ -93,7 +91,7 @@ def verify_user_alias(user, token):
     if token.to_alias_type == 'EMAIL':
         if token.to_alias == getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME):
             setattr(user, api_settings.PASSWORDLESS_USER_EMAIL_VERIFIED_FIELD_NAME, True)
-    elif token.to_alias_type == 'MOBILE':
+    elif token.to_alias_type in ['MOBILE', 'WHATSAPP']:
         if token.to_alias == getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME):
             setattr(user, api_settings.PASSWORDLESS_USER_MOBILE_VERIFIED_FIELD_NAME, True)
     else:
