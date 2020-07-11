@@ -222,20 +222,25 @@ def send_whatsapp_message_with_callback_token(user, mobile_token, **kwargs):
             if to_whatsapp_number.__class__.__name__ == 'PhoneNumber':
                 to_whatsapp_number = f"whatsapp:{to_whatsapp_number.__str__()}"
 
-            # The number sending the token via WHatsApp (the Twilio Sandbox)
+            # The number sending the token via WhatsApp (the Twilio Sandbox)
             from_whatsapp_number = f"whatsapp:{api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER}"
 
-            twilio_client.messages.create(
-                body=f"{base_string}{mobile_token.key}",
-                to=to_whatsapp_number,
-                from_=from_whatsapp_number
-            )
-            return True
+            try:
+                twilio_client.messages.create(
+                    body=f"{base_string}{mobile_token.key}",
+                    to=to_whatsapp_number,
+                    from_=from_whatsapp_number
+                )
+            except Exception as e:
+                print(e)
+                raise
+            finally:
+                return True
         else:
             logger.debug("Failed to send token sms. Missing PASSWORDLESS_MOBILE_NOREPLY_NUMBER.")
             return False
     except ImportError:
-        logger.debug("Couldn't import Twilio client. Is twilio installed?")
+        logger.debug("Couldn't import Twilio client. Is Twilio installed?")
         return False
     except KeyError:
         logger.debug("Couldn't send SMS."
