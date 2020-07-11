@@ -1,7 +1,8 @@
 from drfpasswordless.utils import (
     create_callback_token_for_user,
     send_email_with_callback_token,
-    send_sms_with_callback_token
+    send_sms_with_callback_token,
+    send_whatsapp_message_with_callback_token
 )
 
 
@@ -14,6 +15,8 @@ class TokenService(object):
             send_action = send_email_with_callback_token
         elif alias_type == 'mobile':
             send_action = send_sms_with_callback_token
+        elif alias_type == 'whatsapp':
+            send_action = send_whatsapp_message_with_callback_token
         # Send to alias
         success = send_action(user, token, **message_payload)
         return success

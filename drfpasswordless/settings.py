@@ -17,6 +17,9 @@ DEFAULTS = {
     # The user's mobile field name
     'PASSWORDLESS_USER_MOBILE_FIELD_NAME': 'mobile',
 
+    # The user's WhatsApp number field name
+    'PASSWORDLESS_USER_WHATSAPP_FIELD_NAME': 'whatsapp',
+
     # Marks itself as verified the first time a user completes auth via token.
     # Automatically unmarks itself if email is changed.
     'PASSWORDLESS_USER_MARK_EMAIL_VERIFIED': False,

@@ -1,5 +1,6 @@
 import logging
 import os
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail
@@ -7,13 +8,13 @@ from django.template import loader
 from django.utils import timezone
 from drfpasswordless.models import CallbackToken
 from drfpasswordless.settings import api_settings
-
+from twilio.rest import Client
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-def authenticate_by_token(callback_token,email=None, mobile=None):
+def authenticate_by_token(callback_token, email=None, mobile=None):
     try:
         token = CallbackToken.objects.get(key=callback_token, is_active=True)
 
@@ -44,7 +45,6 @@ def authenticate_by_token(callback_token,email=None, mobile=None):
 
 
 def create_callback_token_for_user(user, token_type):
-
     token = None
     token_type = token_type.upper()
 
@@ -132,14 +132,14 @@ def send_email_with_callback_token(user, email_token, **kwargs):
 
             # Inject context if user specifies.
             context = inject_template_context({'callback_token': email_token.key, })
-            html_message = loader.render_to_string(email_html, context,)
+            html_message = loader.render_to_string(email_html, context, )
             send_mail(
                 email_subject,
                 email_plaintext % email_token.key,
                 api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS,
                 [getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)],
                 fail_silently=False,
-                html_message=html_message,)
+                html_message=html_message, )
 
         else:
             logger.debug("Failed to send token email. Missing PASSWORDLESS_EMAIL_NOREPLY_ADDRESS.")
@@ -148,8 +148,8 @@ def send_email_with_callback_token(user, email_token, **kwargs):
 
     except Exception as e:
         logger.debug("Failed to send token email to user: %d."
-                  "Possibly no email on user object. Email entered was %s" %
-                  (user.id, getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)))
+                     "Possibly no email on user object. Email entered was %s" %
+                     (user.id, getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)))
         logger.debug(e)
         return False
 
@@ -166,11 +166,10 @@ def send_sms_with_callback_token(user, mobile_token, **kwargs):
 
         if api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER:
             # We need a sending number to send properly
-            if api_settings.PASSWORDLESS_TEST_SUPPRESSION is True:
+            if api_settings.PASSWORDLESS_TEST_SUPPRESSION:
                 # we assume success to prevent spamming SMS during testing.
                 return True
 
-            from twilio.rest import Client
             twilio_client = Client(os.environ['TWILIO_ACCOUNT_SID'], os.environ['TWILIO_AUTH_TOKEN'])
 
             to_number = getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)
@@ -191,10 +190,57 @@ def send_sms_with_callback_token(user, mobile_token, **kwargs):
         return False
     except KeyError:
         logger.debug("Couldn't send SMS."
-                  "Did you set your Twilio account tokens and specify a PASSWORDLESS_MOBILE_NOREPLY_NUMBER?")
+                     "Did you set your Twilio account tokens and specify a PASSWORDLESS_MOBILE_NOREPLY_NUMBER?")
     except Exception as e:
         logger.debug("Failed to send token SMS to user: {}. "
-                  "Possibly no mobile number on user object or the twilio package isn't set up yet. "
-                  "Number entered was {}".format(user.id, getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)))
+                     "Possibly no mobile number on user object or the twilio package isn't set up yet. "
+                     "Number entered was {}".format(user.id,
+                                                    getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)))
+        logger.debug(e)
+        return False
+
+
+def send_whatsapp_message_with_callback_token(user, mobile_token, **kwargs):
+    """
+    Sends a WhatsApp message to user.mobile via Twilio.
+
+    Passes silently without sending in test environment.
+    """
+    base_string = kwargs.get('whatsapp_message', api_settings.PASSWORDLESS_MOBILE_MESSAGE)
+
+    try:
+        if api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER:
+            # We need a sending number to send properly
+            if api_settings.PASSWORDLESS_TEST_SUPPRESSION:
+                # we assume success to prevent spamming SMS during testing.
+                return True
+
+            twilio_client = Client(os.environ['TWILIO_ACCOUNT_SID'], os.environ['TWILIO_AUTH_TOKEN'])
+
+            # TODO: send WhatsApp message
+            to_number = getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)
+            if to_number.__class__.__name__ == 'PhoneNumber':
+                to_number = to_number.__str__()
+
+            twilio_client.messages.create(
+                body=f"{base_string}{mobile_token.key}",
+                to=to_number,
+                from_=api_settings.PASSWORDLESS_MOBILE_NOREPLY_NUMBER
+            )
+            return True
+        else:
+            logger.debug("Failed to send token sms. Missing PASSWORDLESS_MOBILE_NOREPLY_NUMBER.")
+            return False
+    except ImportError:
+        logger.debug("Couldn't import Twilio client. Is twilio installed?")
+        return False
+    except KeyError:
+        logger.debug("Couldn't send SMS."
+                     "Did you set your Twilio account tokens and specify a PASSWORDLESS_MOBILE_NOREPLY_NUMBER?")
+    except Exception as e:
+        logger.debug("Failed to send token SMS to user: {}. "
+                     "Possibly no mobile number on user object or the twilio package isn't set up yet. "
+                     "Number entered was {}".format(user.id,
+                                                    getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)))
         logger.debug(e)
         return False

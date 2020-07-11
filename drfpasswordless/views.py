@@ -1,10 +1,5 @@
 import logging
-from rest_framework import parsers, renderers, status
-from rest_framework.authtoken.models import Token
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated 
-from rest_framework.views import APIView
-from drfpasswordless.settings import api_settings
+
 from drfpasswordless.serializers import (
     EmailAuthSerializer,
     MobileAuthSerializer,
@@ -14,6 +9,12 @@ from drfpasswordless.serializers import (
     MobileVerificationSerializer,
 )
 from drfpasswordless.services import TokenService
+from drfpasswordless.settings import api_settings
+from rest_framework import status
+from rest_framework.authtoken.models import Token
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 
