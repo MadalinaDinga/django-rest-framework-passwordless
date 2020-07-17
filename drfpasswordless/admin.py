@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.urls import reverse
 from drfpasswordless.models import CallbackToken
-from django.forms.models import BaseInlineFormSet
 
 
 class UserLinkMixin(object):
@@ -13,6 +12,7 @@ class UserLinkMixin(object):
     def link_to_user(self, obj):
         link = reverse('admin:users_user_change', args=[obj.user.id])
         return u'<a href={}>{}</a>'.format(link, obj.user.username)
+
     link_to_user.allow_tags = True
     link_to_user.short_description = 'User'
 

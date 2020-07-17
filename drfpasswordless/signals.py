@@ -1,13 +1,14 @@
 import logging
+
 from django.contrib.auth import get_user_model
-from django.dispatch import receiver
 from django.db.models import signals
+from django.dispatch import receiver
 from drfpasswordless.models import CallbackToken
 from drfpasswordless.models import generate_numeric_token
-from drfpasswordless.settings import api_settings
 from drfpasswordless.services import TokenService
+from drfpasswordless.settings import api_settings
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('root')
 
 
 @receiver(signals.pre_save, sender=CallbackToken)
@@ -18,7 +19,6 @@ def invalidate_previous_tokens(sender, instance, **kwargs):
     active_tokens = None
     if isinstance(instance, CallbackToken):
         active_tokens = CallbackToken.objects.active().filter(user=instance.user).exclude(id=instance.id)
-
     # Invalidate tokens
     if active_tokens:
         for token in active_tokens:

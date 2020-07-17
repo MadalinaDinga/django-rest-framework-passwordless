@@ -1,7 +1,8 @@
 import uuid
 from random import randint
-from django.db import models
+
 from django.conf import settings
+from django.db import models
 
 
 def generate_hex_token():

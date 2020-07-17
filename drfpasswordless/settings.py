@@ -1,9 +1,13 @@
+from logging.config import dictConfig
+
 from django.conf import settings
 from rest_framework.settings import APISettings
 
 USER_SETTINGS = getattr(settings, 'PASSWORDLESS_AUTH', None)
 
 DEFAULTS = {
+    # Whether the application runs in debug mode
+    'PASSWORDLESS_DEBUG': False,
 
     # Allowed auth types, can be EMAIL, MOBILE, or both.
     'PASSWORDLESS_AUTH_TYPES': ['EMAIL'],
@@ -81,3 +85,24 @@ IMPORT_STRINGS = (
 )
 
 api_settings = APISettings(USER_SETTINGS, DEFAULTS, IMPORT_STRINGS)
+
+# Configure loggers
+if api_settings.PASSWORDLESS_DEBUG:
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'handlers': {
+            'console': {
+                'level': 'DEBUG',
+                'class': 'logging.StreamHandler',
+            },
+        },
+        'loggers': {
+            'root': {
+                'handlers': ['console'],
+                'level': 'DEBUG',
+                'propagate': True,
+            },
+        }
+    }
+    dictConfig(LOGGING)

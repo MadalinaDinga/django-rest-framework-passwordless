@@ -1,15 +1,16 @@
 import logging
-from django.utils.translation import ugettext_lazy as _
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.validators import RegexValidator
-from rest_framework import serializers
+from django.http import Http404
+from django.utils.translation import ugettext_lazy as _
 from drfpasswordless.models import CallbackToken
 from drfpasswordless.settings import api_settings
 from drfpasswordless.utils import authenticate_by_token, verify_user_alias, validate_token_age
-from django.http import Http404
+from rest_framework import serializers
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('root')
 User = get_user_model()
 
 
@@ -103,6 +104,7 @@ class AbstractBaseAliasVerificationSerializer(serializers.Serializer):
     Abstract class that returns a callback token based on the field given
     Returns a token if valid, None or a message if not.
     """
+
     @property
     def alias_type(self):
         # The alias type, either email or mobile
@@ -172,8 +174,8 @@ class AbstractBaseCallbackTokenSerializer(serializers.Serializer):
     Returns a user if valid, None or a message if not.
     """
     token = TokenField(min_length=6, max_length=6, validators=[token_age_validator])
-    email = serializers.CharField(allow_null=True,required=False)
-    mobile = serializers.CharField(allow_null=True,required=False)
+    email = serializers.CharField(allow_null=True, required=False)
+    mobile = serializers.CharField(allow_null=True, required=False)
 
 
 class CallbackTokenAuthSerializer(AbstractBaseCallbackTokenSerializer):
@@ -183,13 +185,12 @@ class CallbackTokenAuthSerializer(AbstractBaseCallbackTokenSerializer):
         email = attrs.get('email', None)
         mobile = attrs.get('mobile', None)
 
-
         token = CallbackToken.objects.get(key=callback_token, is_active=True)
         if (email != None) ^ (mobile != None):
             if token:
                 # Check the token type for our uni-auth method.
                 # authenticates and checks the expiry of the callback token.
-                user = authenticate_by_token(token,email=email, mobile=mobile)
+                user = authenticate_by_token(token, email=email, mobile=mobile)
                 if user:
                     if not user.is_active:
                         msg = _('User account is disabled.')
