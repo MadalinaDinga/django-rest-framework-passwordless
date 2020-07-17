@@ -98,7 +98,7 @@ class ObtainWhatsAppCallbackToken(AbstractBaseObtainCallbackToken):
 
     alias_type = 'whatsapp'
 
-    whatsapp_message = api_settings.PASSWORDLESS_MOBILE_MESSAGE
+    whatsapp_message = api_settings.PASSWORDLESS_WHATSAPP_MESSAGE
     message_payload = {'whatsapp_message': whatsapp_message}
 
 
