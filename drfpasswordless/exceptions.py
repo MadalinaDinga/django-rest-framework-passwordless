@@ -1,0 +1,2 @@
+class DRFPwdlessValidationError(Exception):
+    pass

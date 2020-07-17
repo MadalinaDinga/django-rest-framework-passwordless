@@ -7,13 +7,12 @@ from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail
 from django.template import loader
 from django.utils import timezone
+from drfpasswordless.exceptions import DRFPwdlessValidationError
 from drfpasswordless.models import CallbackToken
 from drfpasswordless.settings import api_settings
-from phonenumbers import PhoneNumber
+from phonenumbers import NumberParseException
 from twilio.base.exceptions import TwilioException, TwilioRestException
 from twilio.rest import Client
-
-from incidents.exceptions import CARPATwilioException
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -143,13 +142,12 @@ def send_email_with_callback_token(user, email_token, **kwargs):
             [getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)],
             fail_silently=False,
             html_message=html_message, )
-
         return True
     except Exception as e:
         logger.debug(
             f"Failed to send token email to user {user.id}. "
             f"Possibly no email on user object. The email entered was {getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)}. "
-            f"Failed with error message: {e}")
+            f"Failed with error message: {str(e)}")
         return False
 
 
@@ -161,17 +159,16 @@ def send_sms_with_callback_token(user, mobile_token, **kwargs):
     if api_settings.PASSWORDLESS_TEST_SUPPRESSION:
         # Skip sending alert and assume success to prevent spamming WhatsApp messages during testing
         return True
-
-    twilio_helper = TwilioHelper()
-    base_string = kwargs.get('mobile_message', api_settings.PASSWORDLESS_MOBILE_MESSAGE)
-    message_text = f"{base_string}{mobile_token.key}"
     try:
+        twilio_helper = TwilioHelper()
+        base_string = kwargs.get('mobile_message', api_settings.PASSWORDLESS_MOBILE_MESSAGE)
+        message_text = f"{base_string}{mobile_token.key}"
         twilio_helper.send_message(user=user, message_text=message_text)
         return True
-    except (CARPATwilioException, TwilioRestException) as e:
+    except (DRFPwdlessValidationError, TwilioRestException, TwilioException) as e:
         logger.error(
             f"Failed to send SMS to user {user}."
-            f"Failed with error message: {e}")
+            f"Failed with error message: {str(e)}")
         return False
 
 
@@ -183,17 +180,16 @@ def send_whatsapp_message_with_callback_token(user, mobile_token, **kwargs):
     if api_settings.PASSWORDLESS_TEST_SUPPRESSION:
         # Skip sending alert and assume success to prevent spamming WhatsApp messages during testing
         return True
-
-    twilio_helper = TwilioHelper()
-    base_string = kwargs.get('whatsapp_message', api_settings.PASSWORDLESS_MOBILE_MESSAGE)
-    message_text = f"{base_string}{mobile_token.key}"
     try:
+        twilio_helper = TwilioHelper()
+        base_string = kwargs.get('whatsapp_message', api_settings.PASSWORDLESS_MOBILE_MESSAGE)
+        message_text = f"{base_string}{mobile_token.key}"
         twilio_helper.send_message(user=user, message_text=message_text, is_whatsapp=True)
         return True
-    except (CARPATwilioException, TwilioRestException) as e:
+    except (DRFPwdlessValidationError, TwilioRestException, TwilioException) as e:
         logger.error(
             f"Failed to send WhatsApp message to user {user}."
-            f"Failed with error message: {e}")
+            f"Failed with error message: {str(e)}")
         return False
 
 
@@ -209,22 +205,19 @@ class TwilioHelper(object):
             self.twilio_client = Client(self.TWILIO_ACCOUNT_SID, self.TWILIO_AUTH_TOKEN)
         except TwilioException as e:
             logger.error("Failed to create Twilio client. Please check your Twilio environment settings. "
-                         f"Failed with error message: {e}")
+                         f"Failed with error message: {str(e)}")
             raise
 
-        # Sender number required TODO: check if validation works
+        # Sender number required
         self.twilio_number = getattr(api_settings, 'PASSWORDLESS_MOBILE_NOREPLY_NUMBER')
-        if not isinstance(phonenumbers.parse(self.twilio_number), PhoneNumber):
-            error_msg = "Failed to setup Twilio. Missing or invalid PASSWORDLESS_MOBILE_NOREPLY_NUMBER in settings."
-            logger.error(error_msg)
-            raise CARPATwilioException(error_msg)
+        try:
+            self.validate_phone(self.twilio_number)
+        except DRFPwdlessValidationError as e:
+            raise DRFPwdlessValidationError("Missing or invalid Twilio number") from e
 
     def send_message(self, user, message_text, is_whatsapp=False):
         to_number = getattr(user, self.USER_MOBILE_FIELD_NAME)
-        if not isinstance(to_number, PhoneNumber):
-            error_msg = "Invalid user phone number."
-            logger.error(error_msg)
-            raise CARPATwilioException(error_msg)
+        self.validate_phone(to_number)
         from_number = self.twilio_number
 
         if is_whatsapp:
@@ -240,5 +233,16 @@ class TwilioHelper(object):
         except TwilioRestException as e:
             logger.error(
                 f"Failed to message user {user.id}, with number {to_number}. "
-                f"Failed with error message: {e}")
+                f"Failed with error message: {str(e)}")
             raise
+
+    @staticmethod
+    def validate_phone(phone):
+        try:
+            # TODO: test validation
+            p = phonenumbers.parse(phone)
+            if not phonenumbers.is_valid_number(p):
+                raise DRFPwdlessValidationError("Invalid user phone number.")
+        except NumberParseException as e:
+            logger.error(e)
+            raise DRFPwdlessValidationError from e
