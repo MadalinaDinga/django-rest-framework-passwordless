@@ -154,6 +154,7 @@ def send_email_with_callback_token(user, email_token, **kwargs):
 def send_sms_with_callback_token(user, mobile_token, **kwargs):
     """
     Sends a SMS to user.mobile via Twilio.
+
     Passes silently without sending in test environment.
     """
     if api_settings.PASSWORDLESS_TEST_SUPPRESSION:
@@ -161,8 +162,11 @@ def send_sms_with_callback_token(user, mobile_token, **kwargs):
         return True
     try:
         twilio_helper = TwilioHelper()
+
+        # Get pre-approved Template Message from configuration and append login token
         base_string = kwargs.get('mobile_message', api_settings.PASSWORDLESS_MOBILE_MESSAGE)
         message_text = f"{base_string}{mobile_token.key}"
+
         twilio_helper.send_message(user=user, message_text=message_text)
         return True
     except (DRFPwdlessValidationError, TwilioRestException, TwilioException) as e:
@@ -175,6 +179,10 @@ def send_sms_with_callback_token(user, mobile_token, **kwargs):
 def send_whatsapp_message_with_callback_token(user, mobile_token, **kwargs):
     """
     Sends a WhatsApp message to user.mobile via Twilio.
+
+    A pre-approved message template: "Your {{1}} code is {{2}}" must be used in order to initiate communication.
+    Any other type of message will fail.
+
     Passes silently without sending in test environment.
     """
     if api_settings.PASSWORDLESS_TEST_SUPPRESSION:
@@ -182,8 +190,11 @@ def send_whatsapp_message_with_callback_token(user, mobile_token, **kwargs):
         return True
     try:
         twilio_helper = TwilioHelper()
-        base_string = kwargs.get('whatsapp_message', api_settings.PASSWORDLESS_MOBILE_MESSAGE)
+
+        # Get pre-approved Template Message from configuration and append login token
+        base_string = kwargs.get('whatsapp_message', api_settings.PASSWORDLESS_WHATSAPP_MESSAGE)
         message_text = f"{base_string}{mobile_token.key}"
+
         twilio_helper.send_message(user=user, message_text=message_text, is_whatsapp=True)
         return True
     except (DRFPwdlessValidationError, TwilioRestException, TwilioException) as e:
@@ -217,6 +228,12 @@ class TwilioHelper(object):
             raise DRFPwdlessValidationError(f"Invalid Twilio number - {e}")
 
     def send_message(self, user, message_text, is_whatsapp=False):
+        """
+        This method sends an outbound message, either SMS or WhatsApp.
+        Throws:
+            TwilioRestException - if failed to send alert
+            DRFPwdlessValidationError - if user phone number is not valid
+        """
         # Retrieve user number and validate
         to_number = getattr(user, self.USER_MOBILE_FIELD_NAME)
         self.validate_phone(to_number)
@@ -228,8 +245,8 @@ class TwilioHelper(object):
         try:
             res = self.twilio_client.messages.create(
                 body=message_text,
-                to=to_number,
-                from_=from_number
+                to=str(to_number),
+                from_=str(from_number)
             )
             logger.info(res)
         except TwilioRestException as e:

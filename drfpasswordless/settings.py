@@ -52,6 +52,9 @@ DEFAULTS = {
     # The message sent to mobile users logging in. Takes one string.
     'PASSWORDLESS_MOBILE_MESSAGE': "Use this code to log in: %s",
 
+    # The message sent to mobile users logging in via WhatsApp. Must be a pre-approved message template.
+    'PASSWORDLESS_WHATSAPP_MESSAGE': "Your CARPA code is ",
+
     # Registers previously unseen aliases as new users.
     'PASSWORDLESS_REGISTER_NEW_USERS': True,
 
