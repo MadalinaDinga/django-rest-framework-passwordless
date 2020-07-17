@@ -14,7 +14,7 @@ from phonenumbers import NumberParseException
 from twilio.base.exceptions import TwilioException, TwilioRestException
 from twilio.rest import Client
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('root')
 User = get_user_model()
 
 
@@ -146,8 +146,8 @@ def send_email_with_callback_token(user, email_token, **kwargs):
     except Exception as e:
         logger.debug(
             f"Failed to send token email to user {user.id}. "
-            f"Possibly no email on user object. The email entered was {getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)}. "
-            f"Failed with error message: {str(e)}")
+            f"Possibly no email on user object. The email entered was {getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)}.\n"
+            f"Failed with error message: {e}")
         return False
 
 
@@ -167,8 +167,8 @@ def send_sms_with_callback_token(user, mobile_token, **kwargs):
         return True
     except (DRFPwdlessValidationError, TwilioRestException, TwilioException) as e:
         logger.error(
-            f"Failed to send SMS to user {user}."
-            f"Failed with error message: {str(e)}")
+            f"Failed to send SMS to user {user}.\n"
+            f"Failed with error message: {e}")
         return False
 
 
@@ -188,8 +188,8 @@ def send_whatsapp_message_with_callback_token(user, mobile_token, **kwargs):
         return True
     except (DRFPwdlessValidationError, TwilioRestException, TwilioException) as e:
         logger.error(
-            f"Failed to send WhatsApp message to user {user}."
-            f"Failed with error message: {str(e)}")
+            f"Failed to send WhatsApp message to user {user}.\n"
+            f"Failed with error message: {e}")
         return False
 
 
@@ -204,18 +204,20 @@ class TwilioHelper(object):
         try:
             self.twilio_client = Client(self.TWILIO_ACCOUNT_SID, self.TWILIO_AUTH_TOKEN)
         except TwilioException as e:
-            logger.error("Failed to create Twilio client. Please check your Twilio environment settings. "
-                         f"Failed with error message: {str(e)}")
+            logger.error("Failed to create Twilio client. Please check your Twilio environment settings.\n"
+                         f"Failed with error message: {e}")
             raise
 
-        # Sender number required
+        # Retrieve Twilio number from configuration and validate
         self.twilio_number = getattr(api_settings, 'PASSWORDLESS_MOBILE_NOREPLY_NUMBER')
         try:
-            self.validate_phone(self.twilio_number)
+            p = self.str_to_phonenumber(self.twilio_number)
+            self.validate_phone(p)
         except DRFPwdlessValidationError as e:
-            raise DRFPwdlessValidationError("Missing or invalid Twilio number") from e
+            raise DRFPwdlessValidationError(f"Invalid Twilio number - {e}")
 
     def send_message(self, user, message_text, is_whatsapp=False):
+        # Retrieve user number and validate
         to_number = getattr(user, self.USER_MOBILE_FIELD_NAME)
         self.validate_phone(to_number)
         from_number = self.twilio_number
@@ -232,17 +234,30 @@ class TwilioHelper(object):
             logger.info(res)
         except TwilioRestException as e:
             logger.error(
-                f"Failed to message user {user.id}, with number {to_number}. "
-                f"Failed with error message: {str(e)}")
+                f"Failed to message user {user.id}, with number {to_number}.\n"
+                f"Failed with error message: {e}")
             raise
 
     @staticmethod
-    def validate_phone(phone):
+    def str_to_phonenumber(phonestr):
+        """
+        Converts a str to phone number object.
+        Throws DRFPwdlessValidationError if the number could not be parsed.
+        """
         try:
-            # TODO: test validation
-            p = phonenumbers.parse(phone)
-            if not phonenumbers.is_valid_number(p):
-                raise DRFPwdlessValidationError("Invalid user phone number.")
+            return phonenumbers.parse(phonestr)
         except NumberParseException as e:
             logger.error(e)
-            raise DRFPwdlessValidationError from e
+            raise DRFPwdlessValidationError(e)
+
+    @staticmethod
+    def validate_phone(phoneobj):
+        """
+        Tests whether a phone number is valid.
+        Arguments:
+        phoneobj -- The phone number object
+
+        Throws DRFPwdlessValidationsError if the number is not valid.
+        """
+        if not phonenumbers.is_valid_number(phoneobj):
+            raise DRFPwdlessValidationError("Invalid phone number")
