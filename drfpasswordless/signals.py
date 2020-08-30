@@ -19,6 +19,7 @@ def invalidate_previous_tokens(sender, instance, **kwargs):
     active_tokens = None
     if isinstance(instance, CallbackToken):
         active_tokens = CallbackToken.objects.active().filter(user=instance.user).exclude(id=instance.id)
+
     # Invalidate tokens
     if active_tokens:
         for token in active_tokens:
@@ -49,7 +50,7 @@ def update_alias_verification(sender, instance, **kwargs):
 
         if instance.id:
 
-            if api_settings.PASSWORDLESS_USER_MARK_EMAIL_VERIFIED is True:
+            if api_settings.PASSWORDLESS_USER_MARK_EMAIL_VERIFIED:
                 """
                 For marking email aliases as not verified when a user changes it.
                 """
@@ -65,7 +66,7 @@ def update_alias_verification(sender, instance, **kwargs):
                     if instance_email != old_email and instance_email != "" and instance_email is not None:
                         # Email changed, verification should be flagged
                         setattr(instance, email_verified_field, False)
-                        if api_settings.PASSWORDLESS_AUTO_SEND_VERIFICATION_TOKEN is True:
+                        if api_settings.PASSWORDLESS_AUTO_SEND_VERIFICATION_TOKEN:
                             email_subject = api_settings.PASSWORDLESS_EMAIL_VERIFICATION_SUBJECT
                             email_plaintext = api_settings.PASSWORDLESS_EMAIL_VERIFICATION_PLAINTEXT_MESSAGE
                             email_html = api_settings.PASSWORDLESS_EMAIL_VERIFICATION_TOKEN_HTML_TEMPLATE_NAME
@@ -85,7 +86,7 @@ def update_alias_verification(sender, instance, **kwargs):
                     # User probably is just initially being created
                     setattr(instance, email_verified_field, True)
 
-            if api_settings.PASSWORDLESS_USER_MARK_MOBILE_VERIFIED is True:
+            if api_settings.PASSWORDLESS_USER_MARK_MOBILE_VERIFIED:
                 """
                 For marking mobile aliases as not verified when a user changes it.
                 """
@@ -101,7 +102,7 @@ def update_alias_verification(sender, instance, **kwargs):
                     if instance_mobile != old_mobile and instance_mobile != "" and instance_mobile is not None:
                         # Mobile changed, verification should be flagged
                         setattr(instance, mobile_verified_field, False)
-                        if api_settings.PASSWORDLESS_AUTO_SEND_VERIFICATION_TOKEN is True:
+                        if api_settings.PASSWORDLESS_AUTO_SEND_VERIFICATION_TOKEN:
                             mobile_message = api_settings.PASSWORDLESS_MOBILE_MESSAGE
                             message_payload = {'mobile_message': mobile_message}
                             success = TokenService.send_token(instance, 'mobile', **message_payload)
