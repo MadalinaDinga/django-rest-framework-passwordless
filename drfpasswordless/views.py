@@ -45,8 +45,15 @@ class AbstractBaseObtainCallbackToken(APIView):
 
         serializer = self.serializer_class(data=request.data, context={'request': request})
         if serializer.is_valid(raise_exception=True):
-            # Validate -
+            # Validate
             user = serializer.validated_data['user']
+            if self.alias_type == 'whatsapp' and not user.has_whatsapp_enabled:
+                # Prevents sending tokens to contributor unless WhatsApp is enabled
+                logger.debug(
+                    f"Skipped sending notification to {user} having WhatsApp {user.has_whatsapp_enabled}")
+                message = 'WhatsApp communications must be enabled to receive tokens from CARPA via WhatsApp.'
+                return Response({'detail': message}, status=status.HTTP_409_CONFLICT)
+
             # Create and send callback token
             success = TokenService.send_token(user, self.alias_type, **self.message_payload)
 
